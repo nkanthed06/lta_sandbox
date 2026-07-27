@@ -5,19 +5,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with: {fetch-depth: 0}
       - uses: actions/setup-python@v5
         with: {python-version: "3.12"}
       - run: pip install pytest
       - run: pytest -q
-      # TEST HARNESS, not a real check: fails on the first push to a branch so
-      # the agent's repair loop is forced to run a second round.
+      # TEST HARNESS, not a real check. Uses GitHub's own PR commit count,
+      # which is immune to the merge commit that `actions/checkout` produces on
+      # pull_request events (that inflated a 1-commit branch to 2).
       - name: require-second-round
         if: github.event_name == 'pull_request'
         run: |
-          n=$(git rev-list --count origin/${{ github.base_ref }}..HEAD)
-          echo "commits on branch: $n"
+          n=${{ github.event.pull_request.commits }}
+          echo "PR commit count: $n"
           if [ "$n" -lt 2 ]; then
-            echo "::error::harness: branch has $n commit(s); a repair round is required"
+            echo "::error::harness: PR has $n commit(s); the repair loop must push again"
             exit 1
           fi
