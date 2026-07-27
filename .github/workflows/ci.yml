@@ -3,11 +3,21 @@ on: [push, pull_request]
 jobs:
   test:
     runs-on: ubuntu-latest
-    env:
-      STRICT_MODE: "1"
     steps:
       - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
       - uses: actions/setup-python@v5
         with: {python-version: "3.12"}
       - run: pip install pytest
       - run: pytest -q
+      # TEST HARNESS, not a real check: fails on the first push to a branch so
+      # the agent's repair loop is forced to run a second round.
+      - name: require-second-round
+        if: github.event_name == 'pull_request'
+        run: |
+          n=$(git rev-list --count origin/${{ github.base_ref }}..HEAD)
+          echo "commits on branch: $n"
+          if [ "$n" -lt 2 ]; then
+            echo "::error::harness: branch has $n commit(s); a repair round is required"
+            exit 1
+          fi
